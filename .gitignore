@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+.cache/
+models/
+*.onnx
+*.onnx_data
+*.onnx.data
+*.rai
+*.bin
+*.log

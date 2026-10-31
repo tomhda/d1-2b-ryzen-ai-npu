@@ -1,0 +1,5 @@
+{
+  "login_form": {"type": "noul", "instructions": "Does the screenshot show a sign-in or login form?"},
+  "error": {"type": "noul", "instructions": "Is an error message visibly displayed?"},
+  "page_type": {"type": "choice", "instructions": "What kind of page is shown?", "criteria": {"sign_in": "A sign-in page", "article": "An article or document", "dashboard": "A dashboard with data or controls", "other": "Another kind of page"}}
+}

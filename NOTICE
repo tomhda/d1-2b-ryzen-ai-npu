@@ -1,0 +1,7 @@
+The independent runtime wrapper in this repository is MIT licensed (LICENSE).
+
+The model files, tokenizer, prompt, media, calibration and packing source downloaded from Tomoali/d1-2B-ryzen-ai-npu derive from LiquidAI/d1-2B and LiquidAI/d1-2B-ONNX. They are distributed separately under the LFM Open License v1.0. Their LICENSE and modification NOTICE accompany the model. The MIT license of this runtime does not replace the model license.
+
+The generic example image is drawn locally by examples/smoke.py; it contains no third-party screenshot.
+
+AMD Ryzen AI Software and its native execution-provider DLLs are required separately and are not redistributed by this repository.

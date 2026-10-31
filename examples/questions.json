@@ -1,0 +1,5 @@
+{
+  "refund": {"type": "noul", "instructions": "Is the customer asking for a refund?"},
+  "team": {"type": "choice", "instructions": "Which team should handle the message?", "criteria": {"billing": "Payments and refunds", "shipping": "Delivery and parcels", "technical": "Application or website faults"}},
+  "urgency": {"type": "score", "instructions": "How urgent is the message?", "criteria": ["low", "medium", "high"]}
+}
