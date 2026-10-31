@@ -4,7 +4,7 @@ Framework-free runtime for [LiquidAI/d1-2B](https://huggingface.co/LiquidAI/d1-2
 
 [日本語](docs/ja/README.md)
 
-d1 returns calibrated probabilities for typed questions without generating text. This runtime supports `noul` (yes/no), `choice` and `score`, with text and at most one image. It packs up to 12 questions per forward pass, uses a 4096-token context and stretches images to **640×384**. Audio, video and extraction question types are not supported.
+d1 returns calibrated probabilities for typed questions without generating text. This runtime supports `noul` (yes/no), `choice` and `score`, with text and at most one image. It packs up to 12 questions per forward pass, uses a 4096-token context and automatically resizes input images to **640×384**. Audio, video and extraction question types are not supported.
 
 ## Requirements and installation
 
@@ -44,11 +44,15 @@ Use one model instance per process and serialize requests. Native providers can 
 
 In a standalone Python script, after writing all results, use `sys.stdout.flush(); sys.stderr.flush(); os._exit(0)` (import `sys` and `os` first) to avoid native interpreter teardown.
 
-### First image and local cache
+### First image setup
 
-The first image compiles the supplied native ONNX vision model, which can take about 10 minutes. No precompiled vision cache is downloaded. The runtime exports a local EPContext and subsequent processes load it directly. The default cache is `%LOCALAPPDATA%/d1npu2`; use `--cache-dir` to choose another location. Use `--ryzen-ai-dir` for an SDK installed outside `C:/Program Files/RyzenAI/1.8.0`.
+When you process an image for the first time, the application automatically generates the data needed to run the vision model on your NPU. This can take about 10 minutes. Later runs automatically reuse the saved data, so you can continue using the same commands.
 
-Keep the complete local cache together: the EPContext ONNX, its external bin and the compiler artifacts depend on each other and contain local paths. Do not copy it between machines; regenerate it there. A completion marker and weight fingerprint prevent reuse of incomplete or changed artifacts. A mismatched or incomplete cache is retained and reported as an error; choose a fresh cache directory rather than deleting unrelated files.
+The downloaded model and this generated execution data are stored separately. The default location for the generated data is `%LOCALAPPDATA%/d1npu2`. Use `--cache-dir` if you want to choose its location. Use `--ryzen-ai-dir` if Ryzen AI Software is installed outside `C:/Program Files/RyzenAI/1.8.0`.
+
+#### If the environment changes or setup fails
+
+The generated data depends on the NPU, its driver and Ryzen AI Software. After changing these, select an empty directory with `--cache-dir` to generate data for the new environment. Use the same option if the application reports incomplete or incompatible execution data. You do not need to download the model again. Existing generated files are retained when an error is reported.
 
 ## NPU execution and measurements
 
@@ -56,7 +60,7 @@ Keep the complete local cache together: the EPContext ONNX, its external bin and
 - Language: 143 main projection kernels converted for the NPU. Dense weights are 4-bit, embedding weights 8-bit, attention gates FP32. Embeddings, language Attention/Conv and image preprocessing retain CPU work. This does not mean 100% NPU utilization.
 - `--profile-dir profiles` records execution-provider placement and rejects observed vision CPU fallback or missing language NPU projection events.
 
-On a Ryzen AI 7 PRO 350 / 32 GB / Windows 11 / Ryzen AI Software 1.8.0, a separate benchmark used two screenshots, 24 questions (two sets of 12), three passes, profiling off and four counterbalanced pairs. Both runtimes excluded PyTorch, transformers and torchvision and used the same SDK; the 3B comparator was the locally framework-free runtime, not the older published transformers-based default:
+On a Ryzen AI 7 PRO 350 / 32 GB / Windows 11 / Ryzen AI Software 1.8.0, a separate benchmark used two screenshots, 24 questions (two sets of 12), three passes, profiling off and four counterbalanced pairs. Both model configurations ran without PyTorch, transformers or torchvision and used the same SDK. The 3B figures apply to its framework-free configuration, not its transformers-based configuration:
 
 | Whole-PC physical RAM increase | 2B | Framework-free 3B |
 |---|---:|---:|
@@ -69,7 +73,7 @@ On a separate 48-decision comparison against the same-weight CPU model, 47 decis
 
 ## Model layout and assembly
 
-The Hugging Face model contains native `vision/`, converted `language/`, the tokenizer, original prompt/media/calibration/packing source, licenses and file checksums. It contains no machine-specific vision EPContext or SDK DLLs.
+The Hugging Face model contains native `vision/`, converted `language/`, the tokenizer, original prompt/media/calibration/packing source, licenses and file checksums. NPU execution data is generated during use rather than included in the download. SDK DLLs must be installed separately.
 
 [conversion/assemble.py](conversion/assemble.py) assembles **already converted** language and vision files into this layout. It is not a complete upstream-to-NPU conversion pipeline. The runtime weights preserve the converted architecture, quantization and 4096-token context.
 

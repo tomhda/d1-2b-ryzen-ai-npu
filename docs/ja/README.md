@@ -1,8 +1,10 @@
 # Ryzen AI NPUで動くd1-2B
 
-[LiquidAI/d1-2B](https://huggingface.co/LiquidAI/d1-2B)を、AMD Ryzen AI 300シリーズのNPUで実行します。言語モデルの主な投影演算と画像NN全体をNPU化し、PyTorch・transformers・torchvisionを読み込みません。
+[LiquidAI/d1-2B](https://huggingface.co/LiquidAI/d1-2B)を、AMD Ryzen AI 300シリーズのNPUで実行できます。言語モデルの主な投影演算と画像のニューラルネットワーク全体をNPUで処理し、PyTorch・transformers・torchvisionを使いません。
 
-必要環境はWindows 11、NPU driver、Ryzen AI Software 1.8.0です。SDKのONNX Runtimeを使い、PyPI版で置き換えないでください。
+## インストールと実行
+
+必要な環境はWindows 11、NPUドライバー、Ryzen AI Software 1.8.0です。ONNX RuntimeはRyzen AI Softwareに含まれるものを使い、PyPI版で置き換えないでください。
 
 ```bash
 conda create --clone ryzen-ai-1.8.0 -n d1npu2
@@ -14,12 +16,38 @@ python -m d1npu2 download --to C:/models/d1-2B-ryzen-ai-npu
 python -m d1npu2 screen-check --model C:/models/d1-2B-ryzen-ai-npu --image screenshot.png
 ```
 
-モデルは約2.4GBです。`noul`・`choice`・`score`に対応し、1回のforwardへ最大12問をまとめます。contextは4096、画像は1枚・640×384固定です。音声・動画・抽出型質問には対応していません。独自の質問は`examples/questions.json`を参考にし、`decide --state @message.txt --questions questions.json`で指定します。画像は`--image`、結果ファイルは`--output`、配置検証は`--profile-dir`で指定できます。
+モデルのダウンロード容量は約2.4GBです。初めて画像を処理すると、お使いのNPUに必要な実行用データをPC上に自動生成します。約10分かかる場合がありますが、以降の実行では保存済みのデータを自動的に再利用します。そのまま同じコマンドで利用を続けられます。
 
-最初の画像ではnative ONNXからNPU向けにcompileし、約10分かかる場合があります。生成先は標準で`%LOCALAPPDATA%/d1npu2`、変更する場合は`--cache-dir`を使います。次のプロセスからはローカルEPContextを直接loadします。EPContextのONNXだけでなく、外部bin・compiler artifactsを含むcache全体が必要です。個人環境のpathを含むため、別PCへコピーせず再生成してください。不完全・重み不一致のcacheは削除せずエラーにします。
+## 質問と画像の指定
 
-画像は単一NPU graph、言語の主な投影143個はNPUです。埋め込み、言語Attention/Conv、画像前処理にはCPU処理が残ります。NPU使用率100%を意味しません。1プロセスで1モデルを使用し、要求は直列に処理してください。CLIはnative providerの終了処理の問題を避けるため、結果をflush後にプロセスを終了します。
+`noul`（はい・いいえ）、`choice`（選択式）、`score`（段階評価）の質問に対応します。1回の推論に最大12問をまとめ、入力長の上限は4096トークンです。画像は1枚まで指定でき、640×384へ自動でサイズを調整します。音声・動画・抽出型の質問には対応していません。
 
-別の24判定ベンチマークでは、PC全体の物理RAM増分は2B 4.279GB・軽量3B 4.460GB、推論中は2B 4.265GB・3B 4.427GBでした。Ryzen AI 7 PRO 350 / 32GB / Windows 11 / SDK 1.8.0、同じ2画像×3周を順序反転4ペアで測定しています。背景appを維持したtotal−availableの増分で、モデル専有量や本CLIの起動・初回compileの実測値ではありません。同一重みCPUとの別比較は48判定中47一致、最大確率差0.03363です。サンプル3問presetの精度評価ではありません。
+独自の質問は`examples/questions.json`を参考に作成し、次のように指定します。
 
-独自wrapperはMIT、モデルと元checkpointのコードはLFM Open License v1.0です。年商1,000万米ドル以上の法人の商用利用には同licenseの制限があります。全文はモデル付属のLICENSEを確認してください。[English README](../../README.md)
+```bash
+python -m d1npu2 decide --model C:/models/d1-2B-ryzen-ai-npu --state @message.txt --questions questions.json
+```
+
+`message.txt`はUTF-8で保存してください。画像を加える場合は`--image screenshot.png`、結果をファイルに保存する場合は`--output answers.json`を指定します。NPUへの処理割り当てを確認する場合は`--profile-dir profiles`を指定できます。
+
+## 実行用データの保存先と再生成
+
+初回に生成する実行用データは、ダウンロードしたモデルとは別に、標準で`%LOCALAPPDATA%/d1npu2`へ保存されます。保存先を変える場合は`--cache-dir`を指定してください。
+
+NPU本体・ドライバー・Ryzen AI Softwareを変更した場合は、`--cache-dir`で空の保存先を指定すると、その環境に合った実行用データを生成できます。生成データが不完全、または互換性がないというエラーが表示された場合も同じ操作で再生成してください。モデルを再ダウンロードする必要はありません。エラー時に既存の生成データを自動削除することはありません。
+
+## 処理範囲と実測
+
+画像のニューラルネットワーク全体と言語モデルの主な投影演算143個をNPUで処理します。埋め込み、言語モデルの注意機構・畳み込み、画像の前処理にはCPU処理が残ります。NPU使用率100%を意味するものではありません。
+
+1プロセスで1モデルを使用し、複数の要求は順番に処理してください。実行エンジンの終了処理で問題が起こる場合があるため、コマンドは結果をすべて書き出してからプロセスを終了します。Pythonから直接利用する場合の終了方法は[英語版の使用例](../../README.md#use)を参照してください。
+
+24判定の比較試験では、PC全体の物理RAM増分は推論後が2B 4.279GB・3B 4.460GB、推論中が2B 4.265GB・3B 4.427GBでした。測定環境はRyzen AI 7 PRO 350、32GB、Windows 11、Ryzen AI Software 1.8.0です。同じ2画像を3周処理し、実行順を反転させた4ペアを測定しました。両方ともPyTorch・transformers・torchvisionを使わない構成です。
+
+数値は、物理メモリ総量から利用可能量を引いた値の、実行前6秒間の中央値からの増分です。ほかのアプリケーションを起動したまま測定したPC全体の変化であり、モデル専有量や、このコマンドの起動・初回生成にかかる使用量ではありません。GBは10億バイトです。
+
+同一重みのCPUモデルとの別比較では、48判定中47判定が一致し、最大確率差は0.03363でした。限られた試験での結果であり、サンプルの3問設定の精度を評価した数値ではありません。
+
+## ライセンス
+
+この実行プログラムはMIT、モデルと元モデルのコードはLFM Open License v1.0です。年商1,000万米ドル以上の法人の商用利用には同ライセンスの制限があります。全文はモデル付属のLICENSEを確認してください。[英語版](../../README.md)
