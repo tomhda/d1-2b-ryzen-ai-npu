@@ -129,14 +129,30 @@ def check_seq_len(past_len: int, ids_len: int, max_seq_len: int) -> None:
         )
 
 
+def score_level(probs: list[float]) -> int:
+    """The checkpoint's default score readout: the first level whose
+    cumulative probability reaches one half."""
+    total = sum(probs) or 1.0
+    mass = 0.0
+    for i, p in enumerate(probs):
+        mass += p / total
+        if mass >= 0.5:
+            return i
+    return len(probs) - 1
+
+
 def format_answer(
     qtype: str,
     labels: list[str],
     probs: list[float],
     threshold: float = DEFAULT_NOUL_THRESHOLD,
     invert: bool = False,
+    legend: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Format one answer in the OpenRouter Decisions API shape."""
+    """Format one answer as the checkpoint's ``api.answer`` does; noul adds ``decision``.
+
+    ``legend`` is a score question's level names, lowest first.
+    """
     if len(labels) != len(probs):
         raise ValueError("labels and probabilities length mismatch")
     if not probs:
@@ -153,18 +169,21 @@ def format_answer(
             "noul": p_yes,
             "decision": bool(p_yes >= threshold),
         }
+    best = max(range(len(probs)), key=probs.__getitem__)
     if qtype == "choice":
-        best = max(range(len(probs)), key=probs.__getitem__)
         return {
             "type": "choice",
             "choice": labels[best],
+            "confidence": probs[best],
             "probabilities": dict(zip(labels, probs)),
         }
     if qtype == "score":
-        expected = sum(i * p for i, p in enumerate(probs))
+        level = float(score_level(probs))
         return {
             "type": "score",
-            "score": float(expected),
+            "score": level,
+            "confidence": probs[best],
             "probabilities": {str(i): p for i, p in enumerate(probs)},
+            "legend": {str(i): text for i, text in enumerate(legend or labels)},
         }
     raise ValueError(f"unknown question type {qtype!r}")

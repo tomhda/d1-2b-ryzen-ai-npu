@@ -10,6 +10,12 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(result,{'type':'noul','noul':.8,'decision':True})
         with self.assertRaises(ValueError):validate_questions({'q':{'type':'text','instructions':'Extract text'}})
 
+    def test_choice_and_score_match_checkpoint_answer(self):
+        self.assertEqual(format_answer('choice',['a','b'],[.3,.7]),{'type':'choice','choice':'b','confidence':.7,'probabilities':{'a':.3,'b':.7}})
+        result=format_answer('score',['0','1','2'],[.3,.15,.55],legend=['low','mid','high'])
+        self.assertEqual(result,{'type':'score','score':2.0,'confidence':.55,'probabilities':{'0':.3,'1':.15,'2':.55},'legend':{'0':'low','1':'mid','2':'high'}})
+        self.assertEqual(format_answer('score',['0','1','2'],[.2,.3,.5])['score'],1.0)
+
     def test_external_weight_change_alters_fingerprint(self):
         with tempfile.TemporaryDirectory() as directory:
             root=pathlib.Path(directory);(root/'vision').mkdir();model=root/'vision'/'vision_encoder_npu.onnx';model.write_bytes(b'graph')

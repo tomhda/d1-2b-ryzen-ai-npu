@@ -50,7 +50,7 @@ class D1:
                 for (key,q),values in zip(group.items(),probabilities):
                     if not np.isfinite(values).all():raise ValueError('Nonfinite decision probabilities')
                     labels=['yes','no'] if q['type']=='noul' else list(q['criteria']) if q['type']=='choice' else [str(i) for i in range(len(q['criteria']))]
-                    result[key]=format_answer(q['type'],labels,values,q.get('threshold',.5),q.get('invert',False))
+                    result[key]=format_answer(q['type'],labels,values,q.get('threshold',.5),q.get('invert',False),q['criteria'] if q['type']=='score' else None)
             self.last_timing={'total_s':time.perf_counter()-started,'vision_s':vision_s,'packed_tokens':tokens}
             return result
 

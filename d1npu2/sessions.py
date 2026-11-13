@@ -34,7 +34,8 @@ def language_session(model,deployment,cache,threads=4,profile=None):
     if not dll.is_file():raise FileNotFoundError('Install Ryzen AI Software 1.8.0 or set --ryzen-ai-dir')
     HANDLES.append(os.add_dll_directory(str(deployment)));os.environ['PATH']=str(deployment)+os.pathsep+os.environ['PATH']
     ort.register_execution_provider_library('RyzenAILightExecutionProvider',str(dll))
-    devices=[d for d in ort.get_ep_devices() if d.ep_name=='RyzenAILightExecutionProvider']
+    # The provider can also list the integrated GPU; keep the language model on the NPU.
+    devices=[d for d in ort.get_ep_devices() if d.ep_name=='RyzenAILightExecutionProvider' and d.device.type==ort.OrtHardwareDeviceType.NPU]
     if not devices:raise RuntimeError('Ryzen AI NPU execution provider unavailable')
     so=ort.SessionOptions();so.intra_op_num_threads=threads;so.inter_op_num_threads=1
     so.enable_cpu_mem_arena=False;so.enable_mem_pattern=False;so.add_provider_for_devices(devices,{})
